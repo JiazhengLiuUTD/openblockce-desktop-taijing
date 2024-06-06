@@ -1,0 +1,119 @@
+name: Build and release
+
+on:
+  push:
+    branches: [ anmi ]
+    tags:
+      - 'v*'
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGE.md'
+      - 'doc/*'
+      - '.github/*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Use Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14.x'
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '2.x'
+          architecture: 'x64'
+
+      - name: resource Install
+        uses: actions/checkout@v2
+        with:
+          repository: openblockce/openblockce-resource
+          ref: refs/heads/anmi
+          token: ${{ secrets.GH_PAT }}
+          path: openblockce-resource
+      - run: |
+          cd openblockce-resource
+          npm install
+          npm link
+
+      - name: blocks Install
+        uses: actions/checkout@v2
+        with:
+          repository: openblockce/openblockce-blocks
+          ref: refs/heads/anmi
+          token: ${{ secrets.GH_PAT }}
+          path: openblockce-blocks
+      - run: |
+          cd openblockce-blocks
+          npm install
+          npm link
+
+      - name: vm Install
+        uses: actions/checkout@v2
+        with:
+          repository: openblockce/openblockce-vm
+          ref: refs/heads/anmi
+          token: ${{ secrets.GH_PAT }}
+          path: openblockce-vm
+      - run: |
+          cd openblockce-vm
+          npm install
+          npm link
+
+      - name: l10n Install
+        uses: actions/checkout@v2
+        with:
+          repository: openblockce/openblockce-l10n
+          ref: refs/heads/anmi
+          token: ${{ secrets.GH_PAT }}
+          path: openblockce-l10n
+      - run: |
+          cd openblockce-l10n
+          npm install
+          npm run build
+          npm link
+
+      - name: gui Install
+        uses: actions/checkout@v2
+        with:
+          repository: openblockce/openblockce-gui
+          ref: refs/heads/anmi-desktop
+          token: ${{ secrets.GH_PAT }}
+          path: openblockce-gui
+      - run: |
+          cd openblockce-gui
+          npm install
+          npm link
+          npm link openblock-blocks openblock-vm openblock-l10n
+
+      - name: desktop Install
+        uses: actions/checkout@v2
+        with:
+          repository: openblockce/openblockce-desktop
+          ref: refs/heads/anmi
+          token: ${{ secrets.GH_PAT }}
+          path: openblockce-desktop
+
+      - name: Npm Install
+        run: |
+          cd openblockce-desktop
+          npm install
+          npm link openblock-blocks openblock-vm openblock-l10n openblock-gui openblock-resource
+
+      - name: Build Dist
+        env:
+          GA_ID: ${{ secrets.GA_ID }}
+          NODE_ENV: production
+          NODE_OPTIONS: --max_old_space_size=4096
+        run: |
+          cd openblockce-desktop
+          copy ./src/renderer/renderer/static ./dist/renderer/static
+          copy ./src/renderer/renderer/static/*.* ./dist/renderer/static
+          npm run dist
+
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: TJBlockDesktop-win-x64.exe
+          path: openblockce-desktop/dist/TJBlock*Setup.exe
+          retention-days: 1
